@@ -1,0 +1,41 @@
+conditions:
+  - name: heavy_rain
+    prompt: "Make it a heavy rainstorm with water on the road"
+    severity: extreme
+    category: weather
+
+  - name: dense_fog
+    prompt: "Add dense fog reducing visibility to 20 meters"
+    severity: extreme
+    category: weather
+
+  - name: strong_glare
+    prompt: "Add strong sun glare shining directly into the camera"
+    severity: extreme
+    category: lighting
+
+  - name: night_dark
+    prompt: "Make it a dark night scene with only streetlights"
+    severity: extreme
+    category: lighting
+
+  - name: snow_blizzard
+    prompt: "Make it a heavy snowstorm with snow on the road"
+    severity: extreme
+    category: weather
+
+  - name: dirty_lens
+    prompt: "Add mud and water droplets on the camera lens"
+    severity: moderate
+    category: occlusion
+
+model:
+  name: "timbrooks/instruct-pix2pix"
+  image_guidance_scale: 1.5
+  text_guidance_scale: 7.5
+  num_inference_steps: 50
+
+yolo:
+  model: "yolov8m.pt"
+  confidence_threshold: 0.25
+  iou_threshold: 0.5

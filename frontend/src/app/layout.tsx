@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
+import TaskToggle from "./components/TaskToggle";
 
 export const metadata: Metadata = {
-  title: "Corner Case Analyzer | AI Safety Inspector",
-  description: "Autonomous driving model stress test & vulnerability dashboard",
+  title: "Corner Case Bench — Robustness Dashboard",
+  description: "YOLOv8 autonomous driving model stress test & vulnerability analysis",
 };
 
 function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
@@ -19,32 +20,61 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ko">
       <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700&family=JetBrains+Mono:wght@400;500&display=swap"
           rel="stylesheet"
         />
       </head>
-      <body className="min-h-screen">
-        <div className="mesh-bg" />
-        <nav className="sticky top-0 z-50 backdrop-blur-xl bg-[var(--bg-primary)]/80 border-b border-[var(--border-subtle)] px-6 py-3">
-          <div className="max-w-7xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm font-bold">
-                CC
+      <body>
+        <nav style={{
+          position: "sticky", top: 0, zIndex: 50,
+          background: "rgba(255,255,255,0.92)",
+          backdropFilter: "blur(16px)",
+          WebkitBackdropFilter: "blur(16px)",
+          borderBottom: "1px solid var(--divider)",
+          boxShadow: "0 1px 0 rgba(0,0,0,0.05), 0 4px 12px rgba(99,102,241,0.06)",
+        }}>
+          <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 48px", display: "flex", alignItems: "center", height: 52 }}>
+            {/* Logo */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{
+                width: 28, height: 28, borderRadius: 8,
+                background: "linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                flexShrink: 0,
+              }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+                </svg>
               </div>
-              <div>
-                <span className="font-bold text-base">Corner Case Analyzer</span>
-                <span className="text-xs text-[var(--text-muted)] ml-2">AI Safety Inspector</span>
-              </div>
+              <span style={{
+                fontFamily: "var(--font-sans)", fontWeight: 800, fontSize: 15,
+                letterSpacing: "-0.02em",
+                background: "linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+              }}>
+                Corner Case Bench
+              </span>
             </div>
-            <div className="flex gap-1">
+
+            {/* Task toggle */}
+            <div style={{ marginLeft: 20 }}>
+              <TaskToggle />
+            </div>
+
+            {/* Nav links */}
+            <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 2 }}>
               <NavLink href="/">Overview</NavLink>
               <NavLink href="/compare">Compare</NavLink>
               <NavLink href="/gallery">Gallery</NavLink>
             </div>
           </div>
         </nav>
-        <main className="max-w-7xl mx-auto p-6">{children}</main>
+        <main style={{ maxWidth: 1100, margin: "0 auto", padding: "44px 48px" }}>{children}</main>
       </body>
     </html>
   );

@@ -33,10 +33,14 @@ def main():
         image_dir = args.data_dir / "original"
     else:
         image_dir = args.data_dir / "original" / args.split
-    baseline_dir = args.data_dir / "results" / "baseline"
-    synthetic_dir = args.data_dir / "synthetic"
 
     task = args.task
+    suffix = "_seg" if task == "segment" else "_det"
+    baseline_dir = args.data_dir / "results" / f"baseline{suffix}"
+    synthetic_result_root = args.data_dir / "results" / f"synthetic{suffix}"
+    metrics_root = args.data_dir / "results" / f"metrics{suffix}"
+    synthetic_dir = args.data_dir / "synthetic"
+
     model_name = yolo_cfg["model"]
     if task == "segment":
         model_name = model_name.replace(".pt", "-seg.pt")
@@ -75,8 +79,8 @@ def main():
                 condition_name=cond_name,
                 baseline_dir=baseline_dir,
                 synthetic_img_dir=synthetic_dir / cond_name,
-                synthetic_result_dir=args.data_dir / "results" / "synthetic" / cond_name,
-                metrics_dir=args.data_dir / "results" / "metrics" / cond_name,
+                synthetic_result_dir=synthetic_result_root / cond_name,
+                metrics_dir=metrics_root / cond_name,
                 model_name=model_name,
                 conf_threshold=yolo_cfg["confidence_threshold"],
                 task=task,

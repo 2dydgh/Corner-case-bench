@@ -155,7 +155,14 @@ def run_evaluation(
         metrics["image_id"] = image_id
         metrics["condition"] = condition_name
         metrics["task"] = task
-        metrics["matched_details"] = matched
+        metrics["matched_details"] = [
+            {
+                "baseline": {k: v for k, v in m["baseline"].items() if k != "mask"},
+                "synthetic": {k: v for k, v in m["synthetic"].items() if k != "mask"},
+                "iou": m["iou"],
+            }
+            for m in matched
+        ]
         metrics["missed_details"] = [
             {"class": m["class"], "bbox": m["bbox"], "confidence": m["confidence"]}
             for m in missed

@@ -1,33 +1,50 @@
 # Corner-Case-Bench
 
-악천후 및 조명 코너 케이스 환경에서 객체 검출(detection) / 분할(segmentation) 모델의 강건성을 stress-test합니다.
+> 악천후 및 조명 코너 케이스에서 객체 검출 / 분할 모델의 강건성을 자동으로 stress-test하는 파이프라인 + 대시보드
 
-InstructPix2Pix로 합성 코너 케이스(짙은 안개, 폭우, 눈, 강한 역광 등)를 자동 생성하고, YOLOv8 모델이 각 조건에서 얼마나 성능 저하되는지 정량 평가합니다.
+InstructPix2Pix로 합성 코너 케이스(짙은 안개, 폭우, 눈, 역광 등)를 생성하고, YOLOv8이 각 조건에서 얼마나 성능이 저하되는지 정량 평가합니다.
+
+---
 
 ## Screenshots
 
-![Overview](./assets/overview.png)
-![Compare — Detection](./assets/compare_detection.png)
-![Compare — Segmentation](./assets/compare_segmentation.png)
-![Gallery](./assets/gallery.png)
+**Overview** — 조건별 성능 저하 요약, 클래스 취약성 랭킹
+
+<img src="./assets/overview.png" width="700">
+
+**Compare (Detection)** — Baseline vs Synthetic bbox 비교 + confidence 분포
+
+<img src="./assets/compare_detection.png" width="700">
+
+**Compare (Segmentation)** — Baseline vs Synthetic mask polygon 비교
+
+<img src="./assets/compare_segmentation.png" width="700">
+
+**Gallery** — 조건/심각도 필터 + worst-case 정렬
+
+<img src="./assets/gallery.png" width="700">
+
+---
 
 ## Pipeline
 
 ```
-Original Images
-     |
-     v
-[Stage 1] Baseline Inference (YOLOv8 / YOLOv8-seg)
-     |
-     v
-[Stage 2] Corner Case Generation (InstructPix2Pix)
-     |
-     v
-[Stage 3] Evaluation (re-inference + metrics comparison)
-     |
-     v
-[Stage 4] Dashboard (Next.js + FastAPI)
+Original Images (BDD100K)
+        │
+        ▼
+[Stage 1] Baseline Inference ─── YOLOv8m / YOLOv8m-seg
+        │
+        ▼
+[Stage 2] Corner Case Generation ─── InstructPix2Pix
+        │
+        ▼
+[Stage 3] Evaluation ─── re-inference + metrics comparison
+        │
+        ▼
+[Stage 4] Dashboard ─── Next.js + FastAPI
 ```
+
+---
 
 ## Quick Start
 
@@ -40,30 +57,29 @@ cd frontend && npm install
 
 ### 2. 데이터 준비
 
-BDD100K 이미지를 `data/original/val/` 아래에 둡니다.
+BDD100K 이미지를 `data/original/val/`에 배치합니다.
 
 ### 3. 파이프라인 실행
 
 ```bash
-# 전체 (detection)
+# Detection 전체
 python -m pipeline.run_pipeline --stage all
 
-# 전체 (segmentation)
+# Segmentation 전체
 python -m pipeline.run_pipeline --stage all --task segment
 
-# 단계별 실행
+# 단계별
 python -m pipeline.run_pipeline --stage baseline
 python -m pipeline.run_pipeline --stage generate
 python -m pipeline.run_pipeline --stage evaluate
 ```
 
-옵션:
-- `--task detect|segment` — bbox detection 또는 instance segmentation (기본: detect)
-- `--stage all|baseline|generate|evaluate` — 특정 단계만 실행
-- `--split train|val|test|all` — BDD100K split 선택 (기본: val)
-- `--limit N` — 처리할 최대 이미지 수 (0 = 전체)
-
-출력 디렉토리는 task에 따라 자동 분기됩니다 (`_seg` / `_det` suffix).
+| Flag | 설명 | 기본값 |
+|------|------|--------|
+| `--task` | `detect` / `segment` | `detect` |
+| `--stage` | `all` / `baseline` / `generate` / `evaluate` | `all` |
+| `--split` | `train` / `val` / `test` / `all` | `val` |
+| `--limit` | 처리할 최대 이미지 수 (0 = 전체) | `0` |
 
 ### 4. 대시보드
 
@@ -71,23 +87,17 @@ python -m pipeline.run_pipeline --stage evaluate
 # Backend
 uvicorn backend.main:app --port 8000
 
-# Frontend (별도 터미널)
+# Frontend
 cd frontend && npm run dev
 ```
 
-http://localhost:3000 접속.
+http://localhost:3000 에서 확인. 상단 **Detection / Segmentation 토글**로 task 전환 가능.
 
-상단 nav의 **Detection / Segmentation 토글**로 모든 페이지의 task 뷰를 전환할 수 있습니다. 토글은 모든 API 호출에 `task=det|seg` 쿼리 파라미터를 부착하며, localStorage로 페이지 간 / 새로고침 후에도 유지됩니다.
-
-#### 페이지 구성
-
-- **Overview** — Safety Score 게이지, vulnerability radar 차트, 조건별 성능 저하, 클래스별 취약성 랭킹, safety alert
-- **Compare** — Baseline vs Synthetic 좌우 비교 + overlay (det는 bbox, seg는 mask polygon), 객체별 detection 표 (Detected / MISSED), confidence 분포 히스토그램
-- **Gallery** — 조건/심각도 필터 + worst-case 정렬, severity badge (Critical / Warning / OK), FN rate 진행 바
+---
 
 ## Conditions
 
-| Condition | 카테고리 | Severity |
+| Condition | Category | Severity |
 |-----------|----------|----------|
 | dense_fog | Weather | Extreme |
 | heavy_rain | Weather | Extreme |
@@ -96,26 +106,30 @@ http://localhost:3000 접속.
 | night_dark | Lighting | Extreme |
 | dirty_lens | Occlusion | Moderate |
 
-조건은 `configs/prompts.yaml` 에서 변경 가능.
+`configs/prompts.yaml`에서 조건 추가/변경 가능.
+
+---
 
 ## Metrics
 
 | Metric | 설명 |
-|--------|-----|
-| IoU | Baseline과 synthetic detection 간 bbox(det) 또는 mask(seg) overlap |
-| Confidence Drop | 매칭된 객체에 대한 모델 confidence 감소량 |
-| False Negative Rate | Baseline에 있던 객체 중 synthetic에서 놓친 비율 |
-| Class Flip Rate | 매칭된 객체 중 클래스가 바뀐 비율 |
+|--------|------|
+| **IoU** | Baseline ↔ Synthetic bbox(det) 또는 mask(seg) overlap |
+| **Confidence Drop** | 매칭된 객체의 confidence 감소량 |
+| **False Negative Rate** | Baseline 객체 중 Synthetic에서 놓친 비율 |
+| **Class Flip Rate** | 매칭된 객체 중 클래스가 바뀐 비율 |
 
-Seg는 binary mask IoU, det는 bbox IoU 기반으로 Hungarian matching을 사용해 baseline-synthetic 객체를 1:1 매칭합니다.
+Hungarian matching으로 baseline-synthetic 객체를 1:1 매칭합니다.
+
+---
 
 ## Results
 
-YOLOv8m / YOLOv8m-seg를 BDD100K val 1,000장에서 생성한 **합성 코너 케이스 1,259장**(6 conditions)에 대해 평가했습니다.
+BDD100K val 1,000장 → **합성 코너 케이스 1,259장** (6 conditions), YOLOv8m / YOLOv8m-seg 평가.
 
 ### 조건별 성능 저하
 
-| Condition | n | FN% (seg) | FN% (det) | IoU (seg) | IoU (det) | Conf Drop (seg) | 심각도 |
+| Condition | n | FN% (seg) | FN% (det) | IoU (seg) | IoU (det) | Conf Drop | 심각도 |
 |---|---:|---:|---:|---:|---:|---:|---|
 | dense_fog | 200 | **76.7%** | **76.0%** | 0.34 | 0.35 | 0.032 | 치명적 |
 | night_dark | 44 | 63.6% | 68.7% | 0.57 | 0.57 | 0.111 | 치명적 |
@@ -124,9 +138,9 @@ YOLOv8m / YOLOv8m-seg를 BDD100K val 1,000장에서 생성한 **합성 코너 �
 | heavy_rain | 567 | 17.9% | 18.1% | 0.88 | 0.88 | 0.030 | 양호 |
 | snow_blizzard | 200 | 15.9% | 17.5% | 0.87 | 0.87 | 0.016 | 양호 |
 
-### 가장 취약한 클래스 (miss rate 기준)
+### 가장 취약한 클래스
 
-| Class | Baseline 개수 | Miss% | 평균 conf drop | Class flip |
+| Class | Baseline 수 | Miss% | Conf Drop | Class Flip |
 |---|---:|---:|---:|---:|
 | potted plant | 38 | 78.9% | 0.124 | 0 |
 | bench | 18 | 77.8% | -0.097 | 0 |
@@ -137,46 +151,49 @@ YOLOv8m / YOLOv8m-seg를 BDD100K val 1,000장에서 생성한 **합성 코너 �
 | car | 8,298 | 36.3% | 0.041 | 75 |
 | truck | 777 | 34.1% | 0.036 | **111** |
 
-### 핵심 인사이트
+### Key Insights
 
-1. **"안 보이는" 실패가 "잘못 보는" 실패보다 압도적.** dense_fog는 IoU 0.34인데 conf drop은 0.03밖에 안 됨 — 모델이 *조용히 76.7% 객체를 놓치는* 중. 자율주행 안전 측면에서 가장 위험한 silent failure.
-2. **조명 변화 >> 날씨 변화 (스트레스 강도).** 균일한 밝기 변화(비, 눈)는 모델에 거의 영향 없음 (FN ~17%, IoU ~0.87). 공간적으로 비균일한 조명(역광, 야간, 렌즈 오염)에서 conf drop이 4-7배 큼.
-3. **`traffic light`, `bench`에 hallucination 신호.** 두 클래스 모두 conf drop이 *음수* — 악조건에서 오히려 더 자신 있게 detect함. 위험한 false positive 가능성.
-4. **차량 종류 혼동이 최다 class-flip 패턴.** truck 111×, car 75×, bus 29× — 코너 케이스에서 car/truck/bus 구분이 뒤섞이므로 downstream 로직에서 차종을 신뢰하면 안 됨.
-5. **Seg와 det는 같은 속도로 무너짐.** 모든 condition에서 두 task 간 메트릭 차이 ≤0.02 — segmentation을 추가 운용해도 별도의 robustness 페널티(혹은 이득)는 없음.
+1. **Silent failure 지배적** — dense_fog에서 모델이 76.7% 객체를 조용히 놓침 (conf drop은 겨우 0.03)
+2. **비균일 조명 >> 균일 날씨** — 역광/야간(FN 40-77%)이 비/눈(FN ~17%)보다 4-7배 치명적
+3. **Hallucination 신호** — traffic light, bench는 conf drop 음수 (악조건에서 더 확신있게 detect)
+4. **차량 subtype 혼동** — truck 111x, car 75x, bus 29x class flip 발생
+5. **Seg ≈ Det** — 모든 condition에서 두 task 간 메트릭 차이 ≤0.02
 
-**한 줄 결론:** 짙은 안개와 야간이 가장 위험 — *사람만 따로 놓고 봐도 36-39% miss* — 클래스 단위 robustness(작은 정적 객체, 차량 subtype)는 평균 IoU만 봐서는 보이지 않을 만큼 취약함.
+> 짙은 안개와 야간이 가장 위험. 클래스 단위 robustness는 평균 IoU만으로는 보이지 않음.
+
+---
 
 ## Project Structure
 
 ```
 Corner_Case/
 ├── pipeline/
-│   ├── run_pipeline.py    # CLI 진입점
-│   ├── baseline.py        # YOLOv8 baseline inference
-│   ├── generator.py       # InstructPix2Pix corner case 생성
-│   └── evaluator.py       # 재추론 + 메트릭 계산
+│   ├── run_pipeline.py      # CLI 진입점
+│   ├── baseline.py          # YOLOv8 baseline inference
+│   ├── generator.py         # InstructPix2Pix 코너 케이스 생성
+│   └── evaluator.py         # 재추론 + 메트릭 계산
 ├── backend/
-│   └── main.py            # FastAPI REST API
-├── frontend/              # Next.js 대시보드 (glassmorphism UI)
+│   └── main.py              # FastAPI REST API
+├── frontend/                # Next.js 대시보드
 ├── configs/
-│   └── prompts.yaml       # 조건 프롬프트와 모델 설정
+│   └── prompts.yaml         # 조건 프롬프트 및 모델 설정
 ├── data/
-│   ├── original/                 # 원본 이미지 (BDD100K val)
-│   ├── synthetic/                # 생성된 코너 케이스 이미지 (조건별)
+│   ├── original/            # 원본 이미지 (BDD100K)
+│   ├── synthetic/           # 생성된 코너 케이스 이미지
 │   └── results/
-│       ├── baseline_seg/         # YOLOv8-seg 원본 예측 (mask 포함)
-│       ├── baseline_det/         # YOLOv8 원본 예측 (bbox)
-│       ├── synthetic_seg/        # YOLOv8-seg synthetic 예측
-│       ├── synthetic_det/        # YOLOv8 synthetic 예측
-│       ├── metrics_seg/          # 이미지별 segmentation 메트릭 (mask IoU 기반)
-│       └── metrics_det/          # 이미지별 detection 메트릭 (bbox IoU 기반)
+│       ├── baseline_{seg,det}/    # 원본 예측
+│       ├── synthetic_{seg,det}/   # Synthetic 예측
+│       └── metrics_{seg,det}/     # 이미지별 메트릭
 └── tests/
 ```
 
+---
+
 ## Tech Stack
 
-- **Generation**: InstructPix2Pix (Stable Diffusion)
-- **Detection**: YOLOv8m / YOLOv8m-seg (Ultralytics)
-- **Backend**: FastAPI + Uvicorn + OpenCV (mask → polygon 변환)
-- **Frontend**: Next.js 16, React 19, Recharts, Tailwind CSS 4, Framer Motion
+| Layer | Stack |
+|-------|-------|
+| Generation | InstructPix2Pix (Stable Diffusion) |
+| Detection | YOLOv8m / YOLOv8m-seg (Ultralytics) |
+| Backend | FastAPI, Uvicorn, OpenCV |
+| Frontend | Next.js 16, React 19, Recharts, Tailwind CSS 4, Framer Motion |

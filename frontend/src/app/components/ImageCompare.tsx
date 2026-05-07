@@ -1,83 +1,119 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState } from "react";
+import OverlayLayer from "./OverlayLayer";
+
+interface Detection {
+  class: string;
+  bbox: [number, number, number, number];
+  confidence: number;
+  polygons?: number[][][];
+  missed?: boolean;
+}
 
 interface ImageCompareProps {
   imageId: string;
   condition: string;
+  task: "seg" | "det";
+  baselineDetections: Detection[];
+  syntheticDetections: Detection[];
+  imageWidth: number;
+  imageHeight: number;
 }
 
-export default function ImageCompare({ imageId, condition }: ImageCompareProps) {
-  const [sliderPos, setSliderPos] = useState(50);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [isDragging, setIsDragging] = useState(false);
+export default function ImageCompare({
+  imageId,
+  condition,
+  task,
+  baselineDetections,
+  syntheticDetections,
+  imageWidth,
+  imageHeight,
+}: ImageCompareProps) {
+  const [showOverlays, setShowOverlays] = useState(true);
+  const [showLabels, setShowLabels] = useState(true);
 
   const originalSrc = `/api/images/original/val/${imageId}.jpg`;
   const syntheticSrc = `/api/images/synthetic/${condition}/${imageId}.jpg`;
 
-  const handleMove = (clientX: number) => {
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
-    setSliderPos((x / rect.width) * 100);
-  };
+  const toggleBtn = (label: string, on: boolean, onClick: () => void) => (
+    <button
+      onClick={onClick}
+      aria-pressed={on}
+      style={{
+        padding: "4px 10px",
+        fontFamily: "var(--font-mono)",
+        fontSize: 10,
+        letterSpacing: "0.08em",
+        textTransform: "uppercase",
+        border: `1px solid ${on ? "var(--ink)" : "var(--card-brd)"}`,
+        background: on ? "var(--ink)" : "transparent",
+        color: on ? "var(--bg)" : "var(--meta)",
+        cursor: "pointer",
+        borderRadius: 0,
+      }}
+    >
+      {label}
+    </button>
+  );
 
-  const handleMouseDown = () => setIsDragging(true);
-  const handleMouseUp = () => setIsDragging(false);
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (isDragging) handleMove(e.clientX);
-  };
-  const handleTouchMove = (e: React.TouchEvent) => {
-    handleMove(e.touches[0].clientX);
-  };
+  const chip = (text: string, side: "left" | "right") => (
+    <span
+      className="absolute"
+      style={{
+        top: 8,
+        [side]: 10,
+        fontFamily: "var(--font-mono)",
+        fontSize: 10,
+        letterSpacing: "0.04em",
+        padding: "2px 7px",
+        background: "var(--chip-bg)",
+        color: "var(--chip-fg)",
+      }}
+    >
+      {text}
+    </span>
+  );
 
   return (
-    <div className="glass-card p-4">
-      <div className="flex justify-between mb-3">
-        <span className="text-xs font-semibold text-blue-400 uppercase tracking-wider">
-          Original
-        </span>
-        <span className="text-xs font-semibold text-red-400 uppercase tracking-wider">
-          {condition.replace(/_/g, " ")}
+    <div>
+      <div className="flex items-center gap-2 mb-3">
+        {toggleBtn("Overlays", showOverlays, () => setShowOverlays((v) => !v))}
+        {toggleBtn("Labels", showLabels && showOverlays, () => setShowLabels((v) => !v))}
+        <span className="ml-auto" style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--meta)" }}>
+          {baselineDetections.length} → {syntheticDetections.length}
         </span>
       </div>
-      <div
-        ref={containerRef}
-        className="relative overflow-hidden rounded-xl cursor-col-resize select-none"
-        onMouseDown={handleMouseDown}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        onMouseMove={handleMouseMove}
-        onTouchMove={handleTouchMove}
-      >
-        <img
-          src={syntheticSrc}
-          alt="Synthetic"
-          className="w-full h-auto block"
-          draggable={false}
-        />
-        <div
-          className="absolute inset-0 overflow-hidden"
-          style={{ width: `${sliderPos}%` }}
-        >
-          <img
-            src={originalSrc}
-            alt="Original"
-            className="h-full object-cover"
-            style={{ width: containerRef.current ? `${containerRef.current.offsetWidth}px` : "100%" }}
-            draggable={false}
-          />
+      <div className="grid grid-cols-2 gap-3.5">
+        <div className="relative overflow-hidden bg-[#1a1a1a]" style={{ aspectRatio: "16 / 9" }}>
+          <img src={originalSrc} alt="Original" className="w-full h-full object-cover block" />
+          {chip("ORIGINAL", "left")}
+          {chip(`${baselineDetections.length} detected`, "right")}
+          {showOverlays && (
+            <OverlayLayer
+              detections={baselineDetections}
+              task={task}
+              side="baseline"
+              imageWidth={imageWidth}
+              imageHeight={imageHeight}
+              showLabels={showLabels}
+            />
+          )}
         </div>
-        <div
-          className="absolute top-0 bottom-0 w-0.5 bg-white z-20"
-          style={{ left: `${sliderPos}%`, boxShadow: "0 0 8px rgba(255,255,255,0.5)" }}
-        >
-          <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M5 3L2 8L5 13" stroke="#333" strokeWidth="1.5" strokeLinecap="round" />
-              <path d="M11 3L14 8L11 13" stroke="#333" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-          </div>
+        <div className="relative overflow-hidden bg-[#1a1a1a]" style={{ aspectRatio: "16 / 9" }}>
+          <img src={syntheticSrc} alt="Synthetic" className="w-full h-full object-cover block" />
+          {chip(condition.toUpperCase(), "left")}
+          {chip(`${syntheticDetections.length} detected`, "right")}
+          {showOverlays && (
+            <OverlayLayer
+              detections={syntheticDetections}
+              task={task}
+              side="synthetic"
+              imageWidth={imageWidth}
+              imageHeight={imageHeight}
+              showLabels={showLabels}
+            />
+          )}
         </div>
       </div>
     </div>

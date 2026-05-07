@@ -1,6 +1,10 @@
 import json
 from pathlib import Path
+from typing import Literal
 
+import cv2
+import numpy as np
+from PIL import Image
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -16,10 +20,54 @@ app.add_middleware(
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 
+Task = Literal["seg", "det"]
+TASK_DIRS: dict[Task, dict[str, str]] = {
+    "seg": {"metrics": "metrics_seg", "baseline": "baseline_seg", "synthetic": "synthetic_seg"},
+    "det": {"metrics": "metrics_det", "baseline": "baseline_det", "synthetic": "synthetic_det"},
+}
+
+
+def _dirs(task: Task) -> dict[str, Path]:
+    suffix = TASK_DIRS[task]
+    return {key: DATA_DIR / "results" / sub for key, sub in suffix.items()}
+
+
+def _mask_to_polygons(mask_arr: list, img_w: int, img_h: int) -> list[list[list[float]]]:
+    mask = np.array(mask_arr, dtype=np.uint8)
+    mask_h, mask_w = mask.shape
+    scale = min(mask_w / img_w, mask_h / img_h)
+    pad_x = (mask_w - img_w * scale) / 2
+    pad_y = (mask_h - img_h * scale) / 2
+
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    polygons = []
+    for c in contours:
+        if cv2.contourArea(c) < 20:
+            continue
+        eps = 0.002 * cv2.arcLength(c, True)
+        simplified = cv2.approxPolyDP(c, eps, True)
+        pts = [
+            [round((p[0][0] - pad_x) / scale, 1), round((p[0][1] - pad_y) / scale, 1)]
+            for p in simplified
+        ]
+        if len(pts) >= 3:
+            polygons.append(pts)
+    return polygons
+
+
+def _strip_and_polygonize(detections: list[dict], img_w: int, img_h: int, task: Task) -> list[dict]:
+    out = []
+    for det in detections:
+        clean = {"class": det["class"], "bbox": det["bbox"], "confidence": det["confidence"]}
+        if task == "seg" and "mask" in det:
+            clean["polygons"] = _mask_to_polygons(det["mask"], img_w, img_h)
+        out.append(clean)
+    return out
+
 
 @app.get("/api/summary")
-def get_summary():
-    metrics_root = DATA_DIR / "results" / "metrics"
+def get_summary(task: Task = Query("seg")):
+    metrics_root = _dirs(task)["metrics"]
     if not metrics_root.exists():
         return {"conditions": [], "total_images": 0}
 
@@ -93,8 +141,9 @@ def get_results(
     condition: str | None = Query(None),
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
+    task: Task = Query("seg"),
 ):
-    metrics_root = DATA_DIR / "results" / "metrics"
+    metrics_root = _dirs(task)["metrics"]
     if not metrics_root.exists():
         return {"results": [], "total": 0, "page": page}
 
@@ -121,19 +170,48 @@ def get_results(
 
 
 @app.get("/api/results/{image_id}")
-def get_result_detail(image_id: str, condition: str = Query(...)):
-    metrics_path = DATA_DIR / "results" / "metrics" / condition / f"{image_id}.json"
-    baseline_path = DATA_DIR / "results" / "baseline" / f"{image_id}.json"
+def get_result_detail(
+    image_id: str,
+    condition: str = Query(...),
+    task: Task = Query("seg"),
+):
+    dirs = _dirs(task)
+    metrics_path = dirs["metrics"] / condition / f"{image_id}.json"
+    baseline_path = dirs["baseline"] / f"{image_id}.json"
+    synthetic_path = dirs["synthetic"] / condition / f"{image_id}.json"
+    original_img = DATA_DIR / "original" / "val" / f"{image_id}.jpg"
 
     if not metrics_path.exists():
         return {"error": "Not found"}
 
     metrics = json.loads(metrics_path.read_text())
-    baseline = json.loads(baseline_path.read_text()) if baseline_path.exists() else None
+
+    img_w, img_h = (1280, 720)
+    if original_img.exists():
+        with Image.open(original_img) as im:
+            img_w, img_h = im.size
+
+    baseline = None
+    if baseline_path.exists():
+        raw = json.loads(baseline_path.read_text())
+        baseline = {
+            "image_id": raw.get("image_id"),
+            "detections": _strip_and_polygonize(raw.get("detections", []), img_w, img_h, task),
+        }
+
+    synthetic = None
+    if synthetic_path.exists():
+        raw = json.loads(synthetic_path.read_text())
+        synthetic = {
+            "image_id": raw.get("image_id"),
+            "detections": _strip_and_polygonize(raw.get("detections", []), img_w, img_h, task),
+        }
 
     return {
         "metrics": metrics,
         "baseline": baseline,
+        "synthetic": synthetic,
+        "image_size": {"width": img_w, "height": img_h},
     }
 
 
